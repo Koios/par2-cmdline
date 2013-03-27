@@ -20,6 +20,9 @@
 #include "par2cmdline.h"
 
 #ifdef _MSC_VER
+// quick fix for POSIX names
+#define stricmp _stricmp
+
 #ifdef _DEBUG
 #undef THIS_FILE
 static char THIS_FILE[]=__FILE__;

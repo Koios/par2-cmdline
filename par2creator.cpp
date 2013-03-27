@@ -19,8 +19,10 @@
 
 #include "par2cmdline.h"
 #include <sys/types.h>
+#ifndef WIN32
 #include <sys/sysctl.h>
 #include <unistd.h>
+#endif
 
 #ifdef _MSC_VER
 #ifdef _DEBUG
@@ -76,6 +78,9 @@ Par2Creator::Par2Creator(void)
 	// Some stuff for the multi-thread optimization
 	pthread_mutex_init (&progressMutex, NULL);
 	// Go and find number of CPU's in this machine
+#ifdef WIN32
+	numCPUs = pthread_num_processors_np();
+#else // !WIN32
 #ifdef CTL_HW
 	int lName [2] = { CTL_HW, HW_NCPU };
 	size_t lLen = sizeof (numCPUs);
@@ -88,7 +93,8 @@ Par2Creator::Par2Creator(void)
   numCPUs = sysconf( _SC_NPROCESSORS_ONLN );
 #else
   numCPUs = 1;
-#endif
+#endif // CTL_HW
+#endif // !WIN32
 }
 
 Par2Creator::~Par2Creator(void)

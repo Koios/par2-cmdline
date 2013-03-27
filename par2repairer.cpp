@@ -19,12 +19,18 @@
 
 #include "par2cmdline.h"
 #include <sys/types.h>
+
+#ifndef WIN32
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/sysctl.h>
 #include <unistd.h>
+#endif
 
 #ifdef _MSC_VER
+// quick fix for posix names
+#define stricmp _stricmp
+
 #ifdef _DEBUG
 #undef THIS_FILE
 static char THIS_FILE[]=__FILE__;
@@ -122,6 +128,9 @@ Par2Repairer::Par2Repairer(void)
 	pthread_mutex_init (&progressMutex, NULL);
 	pthread_mutex_init (&fileIteratorMutex, NULL);
 	// Go and find out the number of CPU's
+#ifdef WIN32
+	numCPUs = pthread_num_processors_np();
+#else // !WIN32
 #ifdef CTL_HW
 	int lName [2] = { CTL_HW, HW_NCPU };
 	size_t lLen = sizeof (numCPUs);
@@ -134,7 +143,8 @@ Par2Repairer::Par2Repairer(void)
   numCPUs = sysconf( _SC_NPROCESSORS_ONLN );
 #else
   numCPUs = 1;
-#endif
+#endif // CTL_HW
+#endif // !WIN32
 }
 
 Par2Repairer::~Par2Repairer(void)
@@ -171,9 +181,6 @@ Result Par2Repairer::Process(const CommandLine &commandline, bool dorepair)
   // What noiselevel are we using
   noiselevel = commandline.GetNoiseLevel();
 
-  struct rlimit rlp;		// Need this to allow for enough file handles
-  int 	lFileHandlesNeeded;
-
   // Get filesnames from the command line
   string par2filename = commandline.GetParFilename();
   const list<CommandLine::ExtraFile> &extrafiles = commandline.GetExtraFiles();
@@ -201,6 +208,10 @@ Result Par2Repairer::Process(const CommandLine &commandline, bool dorepair)
   if (!CheckPacketConsistency())
     return eInsufficientCriticalData;
 
+// looks like Windows either has no explicit file handle limit, or you shouldn't adjust it
+#ifndef WIN32
+  struct rlimit rlp;		// Need this to allow for enough file handles
+  int 	lFileHandlesNeeded;
   // It appears that during repair the program opens all files simultaneously.
   // Suppose the maximum number of file handles is 256, this would mean you can have
   // about 250 files in a par set. This can be too small, so adjust if necessary. */
@@ -215,6 +226,7 @@ Result Par2Repairer::Process(const CommandLine &commandline, bool dorepair)
       return eLogicError;
     cout << "Increased file limit to " << lFileHandlesNeeded << endl;
   }
+#endif
   
   // Use the information in the main packet to get the source files
   // into the correct order and determine their filenames

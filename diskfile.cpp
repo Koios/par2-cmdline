@@ -20,6 +20,9 @@
 #include "par2cmdline.h"
 
 #ifdef _MSC_VER
+// quick fix for posix names
+#define unlink _unlink
+
 #ifdef _DEBUG
 #undef THIS_FILE
 static char THIS_FILE[]=__FILE__;
@@ -343,6 +346,13 @@ list<string>* DiskFile::FindFiles(string path, string wildcard)
   }
 
   return matches;
+}
+
+bool DiskFile::FileExists(string filename)
+{
+  struct stat st;
+  return ((0 == stat(filename.c_str(), &st)) &&
+	  (st.st_mode & S_IFREG) );
 }
 
 u64 DiskFile::GetFileSize(string filename)
@@ -707,6 +717,39 @@ list<string>* DiskFile::FindFiles(string path, string wildcard)
 
   return matches;
 }
+
+bool DiskFile::FileExists(string filename)
+{
+  struct stat st;
+  return ((0 == stat(filename.c_str(), &st)) &&
+         (st.st_mode & (S_IFREG|S_IFBLK)) );
+}
+
+u64 DiskFile::GetFileSize(string filename)
+{
+  struct stat st;
+  if (0 == stat(filename.c_str(), &st))
+  {
+    if (st.st_mode & S_IFREG)
+    {
+      return st.st_size;
+    }
+    else if (st.st_mode & S_IFBLK)
+    {
+      FILE *fp;
+      u64 size = 0;
+      if ( NULL != (fp = fopen(filename.c_str(), "rb")) )
+      {
+	ioctl(fileno(fp), BLKGETSIZE64, &size);
+	fclose(fp);
+      }
+      return size;
+    }
+  }
+
+  return 0;
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #endif
 
@@ -812,38 +855,6 @@ void DiskFile::SplitFilename(string filename, string &path, string &name)
     path = "." PATHSEP;
     name = filename;
   }
-}
-
-bool DiskFile::FileExists(string filename)
-{
-  struct stat st;
-  return ((0 == stat(filename.c_str(), &st)) &&
-	  (st.st_mode & (S_IFREG|S_IFBLK)) );
-}
-
-u64 DiskFile::GetFileSize(string filename)
-{
-  struct stat st;
-  if (0 == stat(filename.c_str(), &st))
-  {
-    if (st.st_mode & S_IFREG)
-    {
-      return st.st_size;
-    }
-    else if (st.st_mode & S_IFBLK)
-    {
-      FILE *fp;
-      u64 size = 0;
-      if ( NULL != (fp = fopen(filename.c_str(), "rb")) )
-      {
-	ioctl(fileno(fp), BLKGETSIZE64, &size);
-	fclose(fp);
-      }
-      return size;
-    }
-  }
-
-  return 0;
 }
 
 
